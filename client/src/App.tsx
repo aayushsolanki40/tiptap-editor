@@ -1,8 +1,9 @@
 import Tiptap from "./Tiptap";
+import "./App.css";
 
 const App = () => {
   return (
-    <div className="card">
+    <div className="app-container">
       <Tiptap />
     </div>
   );

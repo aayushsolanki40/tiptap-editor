@@ -1,0 +1,110 @@
+.editor-container {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  font-family: 'Arial', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-header {
+  padding: 10px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.editor-header h1 {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.editor-toolbar {
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.editor-toolbar button {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 14px;
+  color: #444;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.editor-toolbar button:hover {
+  background: #f1f1f1;
+}
+
+.editor-toolbar button.is-active {
+  background: #e9ecef;
+  border-color: #ced4da;
+  color: #212529;
+}
+
+.editor-content-wrapper {
+  position: relative;
+  flex-grow: 1;
+  background: white;
+  overflow-y: auto;
+}
+
+/* Target the editor content */
+.ProseMirror {
+  padding: 20px;
+  min-height: 100%;
+  outline: none;
+  color: #333; /* Ensuring text is visible */
+  background-color: white;
+}
+
+.ProseMirror p {
+  margin: 0 0 1em 0;
+  line-height: 1.5;
+}
+
+.floating-menu {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  padding: 5px;
+  display: flex;
+  gap: 5px;
+  z-index: 50;
+}
+
+.bubble-menu {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  padding: 5px;
+  display: flex;
+  gap: 5px;
+  z-index: 50;
+}
+
+.bubble-menu button,
+.floating-menu button {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #444;
+  cursor: pointer;
+}
+
+.bubble-menu button:hover,
+.floating-menu button:hover {
+  background: #f1f1f1;
+}
