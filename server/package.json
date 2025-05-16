@@ -1,0 +1,27 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "tsc & node dist/server.js",
+    "dev": "tsc -w & nodemon dist/server.js",
+    "prepare": "npm run build"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@y/websocket-server": "^0.1.1",
+    "ws": "^8.18.2",
+    "y-websocket": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.18",
+    "@types/ws": "^8.18.1",
+    "nodemon": "^3.1.10",
+    "typescript": "^5.8.3"
+  }
+}
