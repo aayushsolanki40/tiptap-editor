@@ -6,11 +6,20 @@ import {
   BubbleMenu,
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useState } from "react";
+import TextAlign from "@tiptap/extension-text-align";
+import Underline from "@tiptap/extension-underline";
+import { useState, useRef, useEffect } from "react";
 import "./Tiptap.css";
 
-// define your extension array
-const extensions = [StarterKit];
+// define your extension array with TextAlign and Underline
+const extensions = [
+  StarterKit,
+  TextAlign.configure({
+    types: ['heading', 'paragraph'],
+    defaultAlignment: 'left',
+  }),
+  Underline,
+];
 
 const content = "<p>Hello World! Start typing to edit this content...</p>";
 
@@ -23,7 +32,33 @@ const Tiptap = () => {
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
   const [currentDocument, setCurrentDocument] = useState("Untitled Document");
   const [showSidebar, setShowSidebar] = useState(true);
-  
+  const [isHeadingDropdownOpen, setIsHeadingDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Get current active heading or paragraph
+  const getActiveHeading = () => {
+    if (!editor) return 'Text';
+    if (editor.isActive('heading', { level: 1 })) return 'H1';
+    if (editor.isActive('heading', { level: 2 })) return 'H2';
+    if (editor.isActive('heading', { level: 3 })) return 'H3';
+    if (editor.isActive('heading', { level: 4 })) return 'H4';
+    if (editor.isActive('paragraph')) return 'Text';
+    return 'Text';
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsHeadingDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   // Example documents for the sidebar
   const documents = [
     { id: 1, name: "Welcome Document", active: true },
@@ -219,25 +254,143 @@ const Tiptap = () => {
               </button>
             </FloatingMenu>
             
-            {/* Bubble Menu for when text is selected */}
+            {/* Bubble Menu - Enhanced with dropdown for headings */}
             <BubbleMenu editor={editor} className="bubble-menu">
+              {/* AI Button */}
+              <button className="ai-button">
+                <span>+AI</span>
+              </button>
+              
+              {/* Divider */}
+              <div className="bubble-menu-divider"></div>
+              
+              {/* Heading dropdown menu */}
+              <div ref={dropdownRef} className={`heading-dropdown ${isHeadingDropdownOpen ? 'open' : ''}`}>
+                <button 
+                  onClick={() => setIsHeadingDropdownOpen(!isHeadingDropdownOpen)}
+                  className="heading-button"
+                >
+                  {getActiveHeading()}
+                  <span className="caret">▾</span>
+                </button>
+                <div className="heading-dropdown-content">
+                  <div 
+                    className={`heading-option ${editor?.isActive('paragraph') ? 'active' : ''}`}
+                    onClick={() => {
+                      editor?.chain().focus().setParagraph().run();
+                      setIsHeadingDropdownOpen(false);
+                    }}
+                  >
+                    Text
+                  </div>
+                  <div 
+                    className={`heading-option ${editor?.isActive('heading', { level: 1 }) ? 'active' : ''}`}
+                    onClick={() => {
+                      editor?.chain().focus().toggleHeading({ level: 1 }).run();
+                      setIsHeadingDropdownOpen(false);
+                    }}
+                  >
+                    Heading 1
+                  </div>
+                  <div 
+                    className={`heading-option ${editor?.isActive('heading', { level: 2 }) ? 'active' : ''}`}
+                    onClick={() => {
+                      editor?.chain().focus().toggleHeading({ level: 2 }).run();
+                      setIsHeadingDropdownOpen(false);
+                    }}
+                  >
+                    Heading 2
+                  </div>
+                  <div 
+                    className={`heading-option ${editor?.isActive('heading', { level: 3 }) ? 'active' : ''}`}
+                    onClick={() => {
+                      editor?.chain().focus().toggleHeading({ level: 3 }).run();
+                      setIsHeadingDropdownOpen(false);
+                    }}
+                  >
+                    Heading 3
+                  </div>
+                  <div 
+                    className={`heading-option ${editor?.isActive('heading', { level: 4 }) ? 'active' : ''}`}
+                    onClick={() => {
+                      editor?.chain().focus().toggleHeading({ level: 4 }).run();
+                      setIsHeadingDropdownOpen(false);
+                    }}
+                  >
+                    Heading 4
+                  </div>
+                </div>
+              </div>
+              
+              {/* Divider */}
+              <div className="bubble-menu-divider"></div>
+              
+              {/* Text formatting */}
               <button 
                 onClick={() => editor?.chain().focus().toggleBold().run()}
                 className={`toolbar-button ${editor?.isActive("bold") ? "is-active" : ""}`}
               >
-                𝐁
+                <b>B</b>
               </button>
               <button 
                 onClick={() => editor?.chain().focus().toggleItalic().run()}
                 className={`toolbar-button ${editor?.isActive("italic") ? "is-active" : ""}`}
               >
-                𝐼
+                <i>I</i>
+              </button>
+              <button 
+                onClick={() => editor?.chain().focus().toggleUnderline().run()}
+                className={`toolbar-button ${editor?.isActive("underline") ? "is-active" : ""}`}
+              >
+                <u>U</u>
               </button>
               <button 
                 onClick={() => editor?.chain().focus().toggleStrike().run()}
                 className={`toolbar-button ${editor?.isActive("strike") ? "is-active" : ""}`}
               >
-                𝐒
+                <s>S</s>
+              </button>
+              
+              {/* Divider */}
+              <div className="bubble-menu-divider"></div>
+              
+              {/* Paragraph formatting */}
+              <button 
+                onClick={() => editor?.chain().focus().setTextAlign('left').run()}
+                className={`toolbar-button ${editor?.isActive({ textAlign: 'left' }) ? "is-active" : ""}`}
+              >
+                <span role="img" aria-label="align left">≡</span>
+              </button>
+              <button 
+                onClick={() => editor?.chain().focus().setTextAlign('center').run()}
+                className={`toolbar-button ${editor?.isActive({ textAlign: 'center' }) ? "is-active" : ""}`}
+              >
+                <span role="img" aria-label="align center">≡</span>
+              </button>
+              <button 
+                onClick={() => editor?.chain().focus().setTextAlign('right').run()}
+                className={`toolbar-button ${editor?.isActive({ textAlign: 'right' }) ? "is-active" : ""}`}
+              >
+                <span role="img" aria-label="align right">≡</span>
+              </button>
+              
+              {/* Divider */}
+              <div className="bubble-menu-divider"></div>
+              
+              {/* Links and more */}
+              <button 
+                onClick={() => {
+                  const url = window.prompt('URL')
+                  if (url) {
+                    editor?.chain().focus().setLink({ href: url }).run()
+                  }
+                }}
+                className={`toolbar-button ${editor?.isActive("link") ? "is-active" : ""}`}
+              >
+                <span role="img" aria-label="link">🔗</span>
+              </button>
+              <button className="toolbar-button">
+                <span role="img" aria-label="more options">⚙️</span>
               </button>
             </BubbleMenu>
           </div>

@@ -248,9 +248,8 @@
   text-decoration: underline;
 }
 
-/* Floating menu and bubble menu */
-.floating-menu,
-.bubble-menu {
+/* Floating menu */
+.floating-menu {
   background: white;
   border-radius: var(--radius-md);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
@@ -260,11 +259,153 @@
   z-index: 50;
 }
 
-.floating-menu .toolbar-button,
-.bubble-menu .toolbar-button {
+/* Bubble menu - updated to match the shared design */
+.bubble-menu {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  z-index: 50;
+  height: 42px;
+}
+
+.ai-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #7c41fb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  height: 30px;
+  padding: 0 10px;
+  margin-right: 4px;
+  cursor: pointer;
   font-size: 13px;
-  height: 28px;
-  min-width: 28px;
+  font-weight: 500;
+}
+
+.ai-button span {
+  margin-right: 4px;
+}
+
+.bubble-menu-divider {
+  width: 1px;
+  height: 24px;
+  background-color: #e0e0e0;
+  margin: 0 4px;
+}
+
+.heading-button {
+  display: flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  padding: 0 8px;
+  height: 30px;
+  border-radius: 4px;
+}
+
+.heading-button.is-active {
+  background-color: #f0f0f0;
+}
+
+.heading-button:hover {
+  background-color: #f0f0f0;
+}
+
+.toolbar-button {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 14px;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  min-width: 30px;
+}
+
+.toolbar-button:hover {
+  background-color: #f0f0f0;
+}
+
+.toolbar-button.is-active {
+  color: #7c41fb;
+}
+
+/* Heading dropdown menu styles */
+.heading-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.heading-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 60px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  padding: 0 8px;
+  height: 30px;
+  border-radius: 4px;
+}
+
+.heading-button .caret {
+  margin-left: 4px;
+  font-size: 10px;
+}
+
+.heading-dropdown-content {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: white;
+  min-width: 120px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 4px 0;
+  z-index: 60;
+}
+
+.heading-dropdown.open .heading-dropdown-content {
+  display: block;
+}
+
+.heading-option {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.heading-option:hover {
+  background-color: #f0f0f0;
+}
+
+.heading-option.active {
+  background-color: #f0f0f0;
+  color: #7c41fb;
 }
 
 /* Status bar */
