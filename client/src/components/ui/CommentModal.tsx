@@ -8,6 +8,7 @@ interface CommentModalProps {
   existingComments?: string[];
   selectedText?: string;
   position?: { x: number; y: number };
+  onResolve?: () => void; // Add new prop for resolve callback
 }
 
 // Common emojis for the picker
@@ -23,7 +24,8 @@ const CommentModal: React.FC<CommentModalProps> = ({
   onSubmit,
   existingComments = [],
   selectedText = "",
-  position = { x: 0, y: 0 }
+  position = { x: 0, y: 0 },
+  onResolve
 }) => {
   const [commentText, setCommentText] = useState('');
   const [isTextExpanded, setIsTextExpanded] = useState(false);
@@ -35,6 +37,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [modalPosition, setModalPosition] = useState({ top: 0, left: 0, transform: '' });
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Calculate best position for the modal when it opens or position changes
   useEffect(() => {
@@ -128,6 +131,8 @@ const CommentModal: React.FC<CommentModalProps> = ({
     // Clear comment text when modal opens
     if (isOpen) {
       setCommentText('');
+      setIsResolved(false); // Reset resolved state when opening
+      setShowConfirmDialog(false); // Reset confirmation dialog
       setTimeout(() => {
         inputRef.current?.focus();
       }, 0);
@@ -212,6 +217,40 @@ const CommentModal: React.FC<CommentModalProps> = ({
     }
   };
 
+  // Handle resolve checkbox change
+  const handleResolveChange = () => {
+    if (!isResolved) {
+      // If changing from unchecked to checked, show confirmation dialog
+      setShowConfirmDialog(true);
+    } else {
+      // If unchecking, just update state
+      setIsResolved(false);
+    }
+  };
+
+  // Handle confirmation dialog responses
+  const handleConfirmResolve = () => {
+    setIsResolved(true);
+    setShowConfirmDialog(false);
+    
+    // Call the onResolve callback if provided
+    if (onResolve) {
+      setTimeout(() => {
+        onResolve();
+      }, 300); // Small delay to show the checkbox checked before closing
+    } else {
+      // If no callback provided, just close the modal
+      setTimeout(() => {
+        onClose();
+      }, 300);
+    }
+  };
+
+  const handleCancelResolve = () => {
+    setShowConfirmDialog(false);
+    setIsResolved(false);
+  };
+
   if (!isOpen) return null;
   
   // Format the highlighted text - limiting it to first 50 characters if not expanded
@@ -231,18 +270,42 @@ const CommentModal: React.FC<CommentModalProps> = ({
           transform: modalPosition.transform
         }}
       >
+        {/* Confirmation Dialog */}
+        {showConfirmDialog && (
+          <div className="confirm-dialog">
+            <div className="confirm-dialog-content">
+              <p>Are you sure you want to resolve this comment?</p>
+              <p className="confirm-dialog-info">This will remove the comment from the document.</p>
+              <div className="confirm-dialog-actions">
+                <button 
+                  className="cancel-button"
+                  onClick={handleCancelResolve}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="confirm-button"
+                  onClick={handleConfirmResolve}
+                >
+                  Resolve
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="comment-modal-header">
           <div className="comment-header-left">
             <input
               type="checkbox"
               className="resolve-checkbox"
               checked={isResolved}
-              onChange={() => setIsResolved(!isResolved)}
+              onChange={handleResolveChange}
               id="resolve-checkbox"
             />
             <label htmlFor="resolve-checkbox">Resolve</label>
           </div>
-          <div className="assigned-to">Assigned to Anyone by {userName}</div>
+          <div className="assigned-to">Assigned to: {userName}</div>
           <button className="comment-modal-close" onClick={onClose}>
             ×
           </button>

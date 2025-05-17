@@ -19,6 +19,10 @@ declare module '@tiptap/core' {
        * Get all comments on the current selection
        */
       getComments: () => string[],
+      /**
+       * Remove comment mark from selected text
+       */
+      unsetComment: () => ReturnType,
     }
   }
 }
@@ -41,7 +45,7 @@ export const Comment = Mark.create<CommentOptions>({
           if (!commentsAttr) return null;
           try {
             return JSON.parse(commentsAttr);
-          } catch (e) {
+          } catch {
             return [commentsAttr]; // Fallback to array with single comment
           }
         },
@@ -92,7 +96,7 @@ export const Comment = Mark.create<CommentOptions>({
 
   addCommands() {
     return {
-      toggleComment: attributes => ({ commands, state }) => {
+      toggleComment: attributes => ({ commands }) => {
         // If there's a comment, add it to an array
         if (attributes?.comment) {
           return commands.updateAttributes('comment', {
@@ -146,28 +150,45 @@ export const Comment = Mark.create<CommentOptions>({
         return commands.setMark(this.name, { comments: [attributes.comment] });
       },
       
-      getComments: () => ({ editor }) => {
-        // Get the current selection
-        const { from, to } = editor.state.selection;
-        
+      getComments: () => {
+        const { from, to } = this.editor.state.selection;
+
         // Don't proceed if no selection
         if (from === to) return [];
-        
+
         // Check if selection has comment mark
-        const hasCommentMark = editor.state.doc.rangeHasMark(from, to, this.type);
-        
+        const hasCommentMark = this.editor.state.doc.rangeHasMark(from, to, this.type);
+
         if (!hasCommentMark) return [];
-        
+
         // Get comments from marks
-        const node = editor.state.doc.nodeAt(from);
+        const node = this.editor.state.doc.nodeAt(from);
         const marks = node?.marks.filter(mark => mark.type.name === this.name) || [];
-        
+
         if (marks.length > 0) {
           const comments = marks[0].attrs.comments;
           return Array.isArray(comments) ? comments : comments ? [comments] : [];
         }
-        
+
         return [];
+      },
+      
+      unsetComment: () => ({ commands, editor }) => {
+        // Get the current selection
+        const { from, to } = editor.state.selection;
+        
+        // Check if there's no text selected
+        if (from === to) {
+          return false;
+        }
+        
+        // Check if selection has comment mark
+        const hasCommentMark = editor.state.doc.rangeHasMark(from, to, this.type);
+        
+        if (!hasCommentMark) return false;
+        
+        // Remove comment mark using the correct API
+        return commands.unsetMark(this.name);
       },
     }
   },

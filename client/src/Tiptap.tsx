@@ -56,7 +56,6 @@ const Tiptap = () => {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkModalPosition, setLinkModalPosition] = useState({ x: 0, y: 0 });
   const [linkUrl, setLinkUrl] = useState<string>('');
-  const [linkText, setLinkText] = useState<string>('');
   // Reference to bubble menu's tippy instance
   const bubbleMenuRef = useRef<any>(null);
   
@@ -221,16 +220,9 @@ const Tiptap = () => {
       // Check if clicked element has comments
       if (target.classList.contains('has-comments')) {
         // Store the current selection before anything happens
-        const selection = window.getSelection();
-        let savedRange: Range | null = null;
-        
-        if (selection && selection.rangeCount > 0) {
-          savedRange = selection.getRangeAt(0).cloneRange();
-        }
         
         // Get position for modal - calculate to ensure it doesn't get cut off
         const rect = target.getBoundingClientRect();
-        const editorRect = editor.view.dom.getBoundingClientRect();
         
         // Calculate vertical position to ensure modal appears below the text
         // but doesn't go off-screen
@@ -542,6 +534,27 @@ const Tiptap = () => {
         editor.commands.setTextSelection({ from, to });
         editor.commands.focus();
         
+        if (bubbleMenuRef.current?.tippy) {
+          bubbleMenuRef.current.tippy.enable();
+        }
+      }, 100);
+    }
+  };
+
+  // Handle when comment is resolved
+  const handleCommentResolve = () => {
+    if (editor) {
+      // Remove the comment formatting from the currently selected text
+      editor.chain().focus().unsetComment().run();
+      
+      // Close the modal
+      setIsCommentModalOpen(false);
+      
+      // Reset existing comments array
+      setExistingComments([]);
+      
+      // Re-enable the bubble menu after modal closes
+      setTimeout(() => {
         if (bubbleMenuRef.current?.tippy) {
           bubbleMenuRef.current.tippy.enable();
         }
@@ -926,6 +939,7 @@ const Tiptap = () => {
               existingComments={existingComments}
               selectedText={selectedText}
               position={commentModalPosition}
+              onResolve={handleCommentResolve} // Pass the resolve handler
             />
             
             {/* Link Modal Component */}
