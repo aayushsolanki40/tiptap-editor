@@ -248,6 +248,32 @@
   text-decoration: underline;
 }
 
+/* Comment styling */
+.ProseMirror .has-comments {
+  background-color: rgba(255, 255, 130, 0.4);
+  border-bottom: 2px dotted #f5b100;
+  cursor: help;
+  position: relative;
+}
+
+.ProseMirror .has-comments::after {
+  content: attr(data-comment-count);
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  background-color: #f5b100;
+  color: white;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
 /* Floating menu */
 .floating-menu {
   background: white;
@@ -257,6 +283,10 @@
   display: flex;
   gap: 4px;
   z-index: 50;
+}
+
+.tippy-box {
+  max-width: max-content !important;
 }
 
 /* Bubble menu - updated to match the shared design */
@@ -269,7 +299,10 @@
   align-items: center;
   gap: 2px;
   z-index: 50;
-  height: 42px;
+  min-height: 42px;
+  flex-wrap: wrap;
+  max-width: 95vw;
+  width: auto;
 }
 
 .ai-button {
@@ -344,7 +377,7 @@
 .toolbar-button.is-active {
   color: #7c41fb;
 }
-
+                                                                            
 /* Heading dropdown menu styles */
 .heading-dropdown {
   position: relative;
@@ -448,4 +481,9 @@
 .icon-button:hover {
   background-color: var(--primary-light);
   color: var(--primary-color);
+}
+
+/* Hide bubble menu when comment modal is open */
+.hide-bubble-menu {
+  display: none !important;
 }

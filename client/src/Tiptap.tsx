@@ -8,7 +8,9 @@ import {
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
-import { useState, useRef, useEffect } from "react";
+import { Comment } from "./lib/CommentExtension";
+import { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from "react";
+import CommentModal from "./components/ui/CommentModal";
 import "./Tiptap.css";
 
 // define your extension array with TextAlign and Underline
@@ -19,6 +21,7 @@ const extensions = [
     defaultAlignment: 'left',
   }),
   Underline,
+  Comment,
 ];
 
 const content = "<p>Hello World! Start typing to edit this content...</p>";
@@ -33,7 +36,36 @@ const Tiptap = () => {
   const [currentDocument, setCurrentDocument] = useState("Untitled Document");
   const [showSidebar, setShowSidebar] = useState(true);
   const [isHeadingDropdownOpen, setIsHeadingDropdownOpen] = useState(false);
+  // Comment Modal state
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [commentModalPosition, setCommentModalPosition] = useState({ x: 0, y: 0 });
+  const [existingComments, setExistingComments] = useState<string[]>([]);
+  // Reference to bubble menu's tippy instance
+  const bubbleMenuRef = useRef<any>(null);
+  
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Hide bubble menu when comment modal opens
+  useEffect(() => {
+    if (isCommentModalOpen && bubbleMenuRef.current?.tippy) {
+      // Force hide the bubble menu
+      bubbleMenuRef.current.tippy.hide();
+    }
+  }, [isCommentModalOpen]);
+
+  // Add an effect to manually hide/show all bubble menus when comment modal opens/closes
+  useEffect(() => {
+    // Find all bubble menu elements in the DOM
+    const bubbleMenus = document.querySelectorAll('.bubble-menu');
+    
+    if (isCommentModalOpen) {
+      // Add hide class to all bubble menus when modal is open
+      bubbleMenus.forEach(menu => menu.classList.add('hide-bubble-menu'));
+    } else {
+      // Remove hide class when modal is closed
+      bubbleMenus.forEach(menu => menu.classList.remove('hide-bubble-menu'));
+    }
+  }, [isCommentModalOpen]);
 
   // Get current active heading or paragraph
   const getActiveHeading = () => {
@@ -58,6 +90,153 @@ const Tiptap = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Setup click handler on content with comments
+  useEffect(() => {
+    if (!editor) return;
+
+    // Function to handle clicks on commented text
+    const handleCommentClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      
+      // Check if clicked element has comments
+      if (target.classList.contains('has-comments')) {
+        // Store the current selection before anything happens
+        const selection = window.getSelection();
+        let savedRange: Range | null = null;
+        
+        if (selection && selection.rangeCount > 0) {
+          savedRange = selection.getRangeAt(0).cloneRange();
+        }
+        
+        // Get position for modal - calculate to ensure it doesn't get cut off
+        const rect = target.getBoundingClientRect();
+        const editorRect = editor.view.dom.getBoundingClientRect();
+        
+        // Calculate vertical position to ensure modal appears below the text
+        // but doesn't go off-screen
+        const verticalPosition = Math.min(
+          rect.bottom + 10,
+          window.innerHeight - 400 // Make sure at least 400px of modal is visible
+        );
+        
+        setCommentModalPosition({
+          x: Math.min(
+            Math.max(rect.left + (rect.width / 2), 200), // At least 200px from left edge
+            window.innerWidth - 200 // At least 200px from right edge
+          ),
+          y: verticalPosition
+        });
+
+        try {
+          // Parse comments from the data-comments attribute
+          const commentsData = target.getAttribute('data-comments');
+          if (commentsData) {
+            const comments = JSON.parse(commentsData);
+            setExistingComments(Array.isArray(comments) ? comments : [comments]);
+            
+            // Select the commented text to ensure the comment gets added at the right place
+            if (editor && target.textContent) {
+              // Create a selection that encompasses the commented text node
+              const commentedNode = target.childNodes[0];
+              
+              if (commentedNode) {
+                const range = document.createRange();
+                range.selectNodeContents(target); 
+                
+                // Update the selection in editor
+                const selection = window.getSelection();
+                if (selection) {
+                  selection.removeAllRanges();
+                  selection.addRange(range);
+                  
+                  // Synchronize editor's selection with DOM selection
+                  const { from, to } = editor.state.selection;
+                  editor.commands.setTextSelection({ from, to });
+                }
+              }
+            }
+            
+            // Then open the modal
+            setIsCommentModalOpen(true);
+          }
+        } catch (e) {
+          console.error('Error parsing comments:', e);
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    // Add event listener to editor DOM
+    const editorElement = editor.view.dom;
+    editorElement.addEventListener('click', handleCommentClick);
+    
+    return () => {
+      editorElement.removeEventListener('click', handleCommentClick);
+    };
+  }, [editor]);
+
+  // Handle adding a comment
+  const handleAddComment = (event?: ReactMouseEvent) => {
+    // Prevent the default behavior that might be causing DOM conflicts
+    event?.preventDefault();
+    event?.stopPropagation();
+    
+    if (event) {
+      // If called from toolbar button, position modal near cursor
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        
+        setCommentModalPosition({
+          x: rect.left + (rect.width / 2),
+          y: rect.top - 10
+        });
+      } else {
+        // Fallback to click position
+        setCommentModalPosition({
+          x: event.clientX,
+          y: event.clientY
+        });
+      }
+    }
+
+    if (editor?.isActive('comment')) {
+      // If selection already has comments, get them
+      const comments = editor.commands.getComments();
+      setExistingComments(comments);
+    } else {
+      setExistingComments([]);
+    }
+    
+    // Set a flag to hide the bubble menu first, then show the modal
+    // We're not directly using state to conditionally render the BubbleMenu anymore
+    setIsCommentModalOpen(true);
+  };
+
+  // Handle when comment is submitted from modal
+  const handleCommentSubmit = (commentText: string) => {
+    if (editor) {
+      // Add the comment
+      editor.chain().focus().addComment({ comment: commentText }).run();
+      
+      // Close the modal
+      setIsCommentModalOpen(false);
+      
+      // Force bubble menu to show by triggering a selection update
+      setTimeout(() => {
+        // This will refresh Tiptap's selection state and trigger bubble menu
+        if (editor.state.selection) {
+          const { from, to } = editor.state.selection;
+          editor.commands.setTextSelection({ from, to });
+          editor.commands.focus();
+        }
+      }, 50);
+    }
+  };
 
   // Example documents for the sidebar
   const documents = [
@@ -254,8 +433,20 @@ const Tiptap = () => {
               </button>
             </FloatingMenu>
             
-            {/* Bubble Menu - Enhanced with dropdown for headings */}
-            <BubbleMenu editor={editor} className="bubble-menu">
+            {/* Bubble Menu - Modified to prevent DOM conflicts */}
+            <BubbleMenu 
+              editor={editor} 
+              className="bubble-menu" 
+              tippyOptions={{
+                duration: 100,
+                hideOnClick: false,
+                onShow: () => {
+                  // Only show if comment modal is not open
+                  return !isCommentModalOpen;
+                }
+              }}
+              ref={bubbleMenuRef} // Attach ref here
+            >
               {/* AI Button */}
               <button className="ai-button">
                 <span>+AI</span>
@@ -389,10 +580,31 @@ const Tiptap = () => {
               >
                 <span role="img" aria-label="link">🔗</span>
               </button>
+              
+              {/* Comment tool - Using mousedown instead of click to avoid race conditions */}
+              <button 
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleAddComment(e);
+                }}
+                className={`toolbar-button ${editor?.isActive("comment") ? "is-active" : ""}`}
+              >
+                <span role="img" aria-label="comment">💬</span>
+              </button>
+              
               <button className="toolbar-button">
                 <span role="img" aria-label="more options">⚙️</span>
               </button>
             </BubbleMenu>
+
+            {/* Comment Modal Component */}
+            <CommentModal
+              isOpen={isCommentModalOpen}
+              onClose={() => setIsCommentModalOpen(false)}
+              onSubmit={handleCommentSubmit}
+              existingComments={existingComments}
+              position={commentModalPosition}
+            />
           </div>
           
           {/* Status Bar */}
