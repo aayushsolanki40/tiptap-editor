@@ -18,8 +18,8 @@
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   overflow: hidden;
-  transform: translate(-50%, -50%);
   z-index: 1001;
+  /* Remove the fixed transform to allow custom positioning */
 }
 
 .link-modal-header {
@@ -81,6 +81,8 @@
   font-size: 14px;
   outline: none;
   transition: border-color 0.2s;
+  background-color: white;
+  color: #333;
 }
 
 .link-input:focus {
@@ -141,4 +143,26 @@
 .link-submit-button:disabled {
   background-color: #a8a4e0;
   cursor: not-allowed;
+}
+
+/* Position-specific styles */
+.link-modal-above {
+  margin-top: -10px; /* Add some space between the modal and the text when positioned above */
+}
+
+.link-modal-below {
+  margin-top: 10px; /* Add some space between the modal and the text when positioned below */
+}
+
+/* For edge cases where modal would be cut off */
+.link-modal-fixed-bottom {
+  position: fixed !important;
+  bottom: 20px;
+  transform: translateX(-50%) !important;
+}
+
+.link-modal-fixed-top {
+  position: fixed !important;
+  top: 80px; /* Account for toolbar height */
+  transform: translateX(-50%) !important;
 }

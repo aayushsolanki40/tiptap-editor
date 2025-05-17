@@ -19,12 +19,85 @@ const LinkModal: React.FC<LinkModalProps> = ({
   const [url, setUrl] = useState(initialUrl);
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [modalPosition, setModalPosition] = useState({ top: 0, left: 0, transform: '' });
+  
+  // Calculate best position for the modal when it opens or position changes
+  useEffect(() => {
+    if (isOpen && modalRef.current) {
+      const modalHeight = 180; // Approximate modal height
+      const modalWidth = 350;   // Modal width from CSS
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      
+      // Safety margin to keep modal from touching edges
+      const safetyMargin = 20;
+      
+      // Get the editor boundaries
+      const editorElement = document.querySelector('.document-container');
+      const editorRect = editorElement?.getBoundingClientRect() || {
+        left: 0,
+        right: viewportWidth,
+        top: 0,
+        bottom: viewportHeight
+      };
+      
+      // Calculate horizontal position - centered on selection but within editor boundaries
+      const leftPos = Math.min(
+        Math.max(
+          position.x, 
+          editorRect.left + (modalWidth / 2) + safetyMargin
+        ),
+        editorRect.right - (modalWidth / 2) - safetyMargin
+      );
+      
+      // Check if there's enough space below the selection
+      const spaceBelow = viewportHeight - position.y - safetyMargin;
+      const spaceAbove = position.y - safetyMargin;
+      
+      let topPos: number;
+      let transform: string;
+      
+      // If modal fits below selection, place it there (default)
+      if (spaceBelow >= modalHeight) {
+        topPos = position.y;
+        transform = 'translate(-50%, 10px)';
+      } 
+      // If not enough space below but enough above, place it above selection
+      else if (spaceAbove >= modalHeight) {
+        topPos = position.y;
+        transform = 'translate(-50%, -100%) translateY(-10px)';
+      }
+      // In tight spaces, position modal centered in available space
+      else {
+        // More space below than above
+        if (spaceBelow >= spaceAbove) {
+          topPos = viewportHeight - modalHeight - safetyMargin + scrollY;
+          transform = 'translateX(-50%)';
+        } 
+        // More space above than below
+        else {
+          // Ensure we don't position above the editor top
+          topPos = Math.max(
+            safetyMargin + scrollY,
+            editorRect.top + safetyMargin + scrollY
+          );
+          transform = 'translateX(-50%)';
+        }
+      }
+      
+      setModalPosition({
+        top: topPos,
+        left: leftPos,
+        transform
+      });
+    }
+  }, [isOpen, position]);
 
   useEffect(() => {
-    // Set initial URL when modal opens
+    // Set initial URL and focus input when modal opens
     setUrl(initialUrl);
     
-    // Focus input field when modal opens
     if (isOpen) {
       setTimeout(() => {
         inputRef.current?.focus();
@@ -73,8 +146,10 @@ const LinkModal: React.FC<LinkModalProps> = ({
         ref={modalRef}
         className="link-modal"
         style={{
-          top: `${position.y}px`,
-          left: `${position.x}px`,
+          position: 'absolute',
+          top: `${modalPosition.top}px`,
+          left: `${modalPosition.left}px`,
+          transform: modalPosition.transform
         }}
       >
         <div className="link-modal-header">

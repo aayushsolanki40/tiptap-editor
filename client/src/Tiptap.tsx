@@ -61,6 +61,78 @@ const Tiptap = () => {
   const bubbleMenuRef = useRef<any>(null);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Function to calculate optimal modal position based on selection
+  const getOptimalModalPosition = (rect: DOMRect) => {
+    // Get viewport dimensions
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
+    
+    // Modal dimensions (approximate)
+    const modalHeight = 180; // Approximate height of the modal
+    const modalWidth = 350;  // Width of the modal from CSS
+    
+    // Safety margin to ensure the modal isn't positioned too close to the edge
+    const safetyMargin = 20;
+    
+    // Calculate horizontal position (centered on text selection)
+    const xPos = Math.min(
+      Math.max(rect.left + rect.width / 2, modalWidth / 2 + safetyMargin), 
+      viewportWidth - modalWidth / 2 - safetyMargin
+    );
+    
+    // Get the editor element and its bounds
+    const editorElement = document.querySelector('.editor-content-wrapper');
+    const editorRect = editorElement?.getBoundingClientRect() || {
+      bottom: viewportHeight,
+      top: 0
+    };
+    
+    // Space available below and above the selection
+    const spaceBelow = viewportHeight - rect.bottom - safetyMargin;
+    const spaceAbove = rect.top - editorRect.top - safetyMargin;
+    
+    // Check if modal would fit below
+    const fitsBelow = spaceBelow >= modalHeight;
+    // Check if modal would fit above
+    const fitsAbove = spaceAbove >= modalHeight;
+    
+    // Determine the best position
+    if (fitsBelow) {
+      // If it fits below, put it there (default position)
+      return {
+        x: xPos,
+        y: rect.bottom + 10,
+        position: 'below'
+      };
+    } else if (fitsAbove) {
+      // If it doesn't fit below but fits above, put it above
+      return {
+        x: xPos, 
+        y: rect.top - 10,
+        position: 'above'
+      };
+    } else {
+      // If it doesn't fit well in either position,
+      // choose the one with more space and adjust the position to fit
+      if (spaceBelow >= spaceAbove) {
+        // More space below, position at bottom of viewport with safe margin
+        return {
+          x: xPos,
+          y: viewportHeight - modalHeight - safetyMargin + scrollY,
+          position: 'fixed-bottom'
+        };
+      } else {
+        // More space above, position at top of content area with safe margin
+        return {
+          x: xPos,
+          y: editorRect.top + safetyMargin + scrollY,
+          position: 'fixed-top'
+        };
+      }
+    }
+  };
 
   // Hide bubble menu when comment modal opens
   useEffect(() => {
@@ -251,10 +323,13 @@ const Tiptap = () => {
         // Get position for modal - calculate to ensure it doesn't get cut off
         const rect = linkElement.getBoundingClientRect();
         
-        // Position the modal near the link
+        // Get optimal position for the modal based on link position
+        const optimalPosition = getOptimalModalPosition(rect);
+        
+        // Position the modal optimally
         setLinkModalPosition({
-          x: rect.left + (rect.width / 2),
-          y: rect.bottom + 10
+          x: optimalPosition.x,
+          y: optimalPosition.position === 'below' ? rect.bottom + 10 : rect.top - 10
         });
         
         // Set the current link URL and show the modal
@@ -418,10 +493,13 @@ const Tiptap = () => {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
       
-      // Position the modal near the selection
+      // Get optimal position for the modal based on selection
+      const optimalPosition = getOptimalModalPosition(rect);
+      
+      // Position the modal optimally
       setLinkModalPosition({
-        x: rect.left + (rect.width / 2),
-        y: rect.bottom + 10
+        x: optimalPosition.x,
+        y: optimalPosition.position === 'below' ? rect.bottom + 10 : rect.top - 10
       });
       
       // Check if we're editing an existing link
