@@ -6,6 +6,7 @@ interface CommentModalProps {
   onClose: () => void;
   onSubmit: (commentText: string) => void;
   existingComments?: string[];
+  selectedText?: string;
   position?: { x: number; y: number };
 }
 
@@ -14,6 +15,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
   onClose,
   onSubmit,
   existingComments = [],
+  selectedText = "",
   position = { x: 0, y: 0 }
 }) => {
   const [commentText, setCommentText] = useState('');
@@ -66,38 +68,37 @@ const CommentModal: React.FC<CommentModalProps> = ({
   if (!isOpen) return null;
   
   // Format the highlighted text - limiting it to first 50 characters if not expanded
-  const highlightedText = existingComments[0] || "sfsdfsdfsfq";
-  const displayText = isTextExpanded || highlightedText.length <= 50 
-    ? highlightedText 
-    : highlightedText.slice(0, 50) + '...';
+  const displayText = isTextExpanded || selectedText.length <= 50 
+    ? selectedText 
+    : selectedText.slice(0, 50) + '...';
 
   return (
     <div className="comment-modal-backdrop">
-      <div 
-        ref={modalRef} 
+      <div
+        ref={modalRef}
         className="comment-modal"
-        style={{ 
+        style={{
           top: `${position.y}px`,
           left: `${position.x}px`,
         }}
       >
         <div className="comment-modal-header">
           <div className="comment-header-left">
-            <input 
-              type="checkbox" 
-              className="resolve-checkbox" 
+            <input
+              type="checkbox"
+              className="resolve-checkbox"
               checked={isResolved}
               onChange={() => setIsResolved(!isResolved)}
               id="resolve-checkbox"
             />
             <label htmlFor="resolve-checkbox">Resolve</label>
           </div>
-          <div className="assigned-to">
-            Assigned to Anyone by {userName}
-          </div>
-          <button className="comment-modal-close" onClick={onClose}>×</button>
+          <div className="assigned-to">Assigned to Anyone by {userName}</div>
+          <button className="comment-modal-close" onClick={onClose}>
+            ×
+          </button>
         </div>
-        
+
         <div className="comment-modal-content">
           <div className="comment-thread">
             {/* First comment with highlighted text */}
@@ -109,30 +110,28 @@ const CommentModal: React.FC<CommentModalProps> = ({
                     <span className="user-name">{userName}</span>
                     <span className="comment-timestamp">Just now</span>
                   </div>
-                  
-                  <div className="comment-highlighted" onClick={toggleTextExpand}>
+
+                  <div
+                    className="comment-highlighted"
+                    onClick={toggleTextExpand}
+                  >
                     <p className="comment-highlighted-text">{displayText}</p>
-                    <span className={`dropdown-icon ${isTextExpanded ? 'open' : ''}`}>
-                      ▼
-                    </span>
+                    { displayText.length > 50 &&
+                      <span
+                        className={`dropdown-icon ${
+                          isTextExpanded ? "open" : ""
+                        }`}
+                      >
+                        ▼
+                      </span>
+                    }
                   </div>
-                  
-                  <div className="comment-text">
-                    {existingComments[0]}
-                  </div>
-                  
-                  <div className="comment-actions">
-                    <button className="comment-action-btn">
-                      👍
-                    </button>
-                    <button className="comment-action-btn">
-                      👎
-                    </button>
-                  </div>
+
+                  <div className="comment-text">{existingComments[0]}</div>
                 </div>
               </div>
             )}
-            
+
             {/* Additional comments here if needed */}
             {existingComments.slice(1).map((comment, index) => (
               <div className="comment-item" key={index}>
@@ -142,15 +141,13 @@ const CommentModal: React.FC<CommentModalProps> = ({
                     <span className="user-name">{userName}</span>
                     <span className="comment-timestamp">Just now</span>
                   </div>
-                  <div className="comment-text">
-                    {comment}
-                  </div>
+                  <div className="comment-text">{comment}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
-        
+
         {/* Comment input area */}
         <div className="comment-input-area">
           <div className="current-user-avatar">{userInitials}</div>
@@ -163,10 +160,8 @@ const CommentModal: React.FC<CommentModalProps> = ({
               className="comment-input"
             />
             <div className="comment-input-actions">
-              <button className="input-action-btn">
-                😊
-              </button>
-              <button 
+              <button className="input-action-btn">😊</button>
+              <button
                 className="send-button"
                 disabled={!commentText.trim()}
                 onClick={handleSubmit}

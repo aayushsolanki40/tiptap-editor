@@ -79,7 +79,7 @@
 .comment-modal-content {
   padding: 0;
   overflow-y: auto;
-  max-height: 60vh;
+  max-height: 250px;
 }
 
 .comment-thread {

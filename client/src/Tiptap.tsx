@@ -40,6 +40,7 @@ const Tiptap = () => {
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentModalPosition, setCommentModalPosition] = useState({ x: 0, y: 0 });
   const [existingComments, setExistingComments] = useState<string[]>([]);
+  const [selectedText, setSelectedText] = useState<string>('');
   // Reference to bubble menu's tippy instance
   const bubbleMenuRef = useRef<any>(null);
   
@@ -174,6 +175,9 @@ const Tiptap = () => {
                 const range = document.createRange();
                 range.selectNodeContents(target); 
                 
+                // Store the selected text
+                setSelectedText(target.textContent);
+                
                 // Update the selection in editor
                 const selection = window.getSelection();
                 if (selection) {
@@ -225,6 +229,9 @@ const Tiptap = () => {
           x: rect.left + (rect.width / 2),
           y: rect.top - 10
         });
+        
+        // Capture the selected text
+        setSelectedText(selection.toString());
       } else {
         // Fallback to click position
         setCommentModalPosition({
@@ -698,6 +705,7 @@ const Tiptap = () => {
               onClose={() => setIsCommentModalOpen(false)}
               onSubmit={handleCommentSubmit}
               existingComments={existingComments}
+              selectedText={selectedText}
               position={commentModalPosition}
             />
           </div>
