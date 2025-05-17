@@ -258,6 +258,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 4px;
+  position: relative;
 }
 
 .input-action-btn:hover {
@@ -284,4 +285,42 @@
 .send-button:disabled {
   background-color: #a8a4e0;
   cursor: not-allowed;
+}
+
+/* Add emoji picker styles */
+.emoji-container {
+  position: relative;
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: 40px;
+  left: 0;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  width: 240px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  z-index: 10;
+}
+
+.emoji-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: background-color 0.2s;
+}
+
+.emoji-btn:hover {
+  background-color: #f0f0f0;
 }

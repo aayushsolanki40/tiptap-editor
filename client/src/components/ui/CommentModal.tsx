@@ -10,6 +10,13 @@ interface CommentModalProps {
   position?: { x: number; y: number };
 }
 
+// Common emojis for the picker
+const commonEmojis = [
+  '😊', '😂', '👍', '❤️', '🎉', '👏', '🙌', '👀', '🤔', '😢', 
+  '😍', '🔥', '💯', '✅', '⭐', '🚀', '💪', '👎', '😞', '🤷‍♂️',
+  '🤷‍♀️', '🙏', '💡', '📝', '💬', '⏰', '💻', '👨‍💻', '👩‍💻', '🤝'
+];
+
 const CommentModal: React.FC<CommentModalProps> = ({
   isOpen,
   onClose,
@@ -25,6 +32,8 @@ const CommentModal: React.FC<CommentModalProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isResolved, setIsResolved] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Clear comment text when modal opens
@@ -52,6 +61,26 @@ const CommentModal: React.FC<CommentModalProps> = ({
     };
   }, [isOpen, onClose]);
 
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        emojiPickerRef.current && 
+        !emojiPickerRef.current.contains(event.target as Node) &&
+        !(event.target as HTMLElement).classList.contains('input-action-btn')
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (commentText.trim()) {
@@ -63,6 +92,35 @@ const CommentModal: React.FC<CommentModalProps> = ({
 
   const toggleTextExpand = () => {
     setIsTextExpanded(!isTextExpanded);
+  };
+
+  const toggleEmojiPicker = () => {
+    setShowEmojiPicker(!showEmojiPicker);
+  };
+
+  const insertEmoji = (emoji: string) => {
+    if (inputRef.current) {
+      const start = inputRef.current.selectionStart || 0;
+      const end = inputRef.current.selectionEnd || 0;
+      const textBeforeEmoji = commentText.substring(0, start);
+      const textAfterEmoji = commentText.substring(end);
+      
+      // Insert emoji at cursor position
+      const newText = textBeforeEmoji + emoji + textAfterEmoji;
+      setCommentText(newText);
+      
+      // Set cursor position after emoji
+      setTimeout(() => {
+        if (inputRef.current) {
+          const newCursorPos = start + emoji.length;
+          inputRef.current.focus();
+          inputRef.current.selectionStart = newCursorPos;
+          inputRef.current.selectionEnd = newCursorPos;
+        }
+      }, 0);
+    } else {
+      setCommentText(commentText + emoji);
+    }
   };
 
   if (!isOpen) return null;
@@ -160,7 +218,34 @@ const CommentModal: React.FC<CommentModalProps> = ({
               className="comment-input"
             />
             <div className="comment-input-actions">
-              <button className="input-action-btn">😊</button>
+              <div className="emoji-container">
+                <button 
+                  className="input-action-btn"
+                  onClick={toggleEmojiPicker}
+                >
+                  😊
+                </button>
+                
+                {showEmojiPicker && (
+                  <div 
+                    ref={emojiPickerRef} 
+                    className="emoji-picker"
+                  >
+                    {commonEmojis.map((emoji, index) => (
+                      <button 
+                        key={index} 
+                        className="emoji-btn"
+                        onClick={() => {
+                          insertEmoji(emoji);
+                          setShowEmojiPicker(false);
+                        }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
                 className="send-button"
                 disabled={!commentText.trim()}
