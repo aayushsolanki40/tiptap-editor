@@ -61,18 +61,40 @@ const Tiptap = () => {
     if (isCommentModalOpen) {
       // Add hide class to all bubble menus when modal is open
       bubbleMenus.forEach(menu => menu.classList.add('hide-bubble-menu'));
+      
+      // Also disable the tippy instance to prevent it from appearing
+      if (bubbleMenuRef.current?.tippy) {
+        bubbleMenuRef.current.tippy.hide();
+        bubbleMenuRef.current.tippy.disable();
+      }
     } else {
       // Remove hide class when modal is closed
       bubbleMenus.forEach(menu => menu.classList.remove('hide-bubble-menu'));
       
-      // When modal closes, refresh the editor's selection state to enable bubble menu
+      // Re-enable tippy only after modal is closed
+      if (bubbleMenuRef.current?.tippy) {
+        bubbleMenuRef.current.tippy.enable();
+      }
+      
+      // When modal closes, refresh the editor's selection state to enable bubble menu for new selections
       if (editor) {
         setTimeout(() => {
-          // This helps ensure bubble menu can reappear for new selections
           editor.commands.focus();
         }, 50);
       }
     }
+    
+    // Add an event listener to catch any bubble menus that might appear while modal is open
+    const preventBubbleMenu = () => {
+      if (isCommentModalOpen && bubbleMenuRef.current?.tippy?.state.isShown) {
+        bubbleMenuRef.current.tippy.hide();
+      }
+    };
+    
+    document.addEventListener('selectionchange', preventBubbleMenu);
+    return () => {
+      document.removeEventListener('selectionchange', preventBubbleMenu);
+    };
   }, [isCommentModalOpen, editor]);
 
   // Get current active heading or paragraph
@@ -220,34 +242,79 @@ const Tiptap = () => {
       setExistingComments([]);
     }
     
-    // Set a flag to hide the bubble menu first, then show the modal
-    // We're not directly using state to conditionally render the BubbleMenu anymore
+    // Force hide any bubble menus first
+    if (bubbleMenuRef.current?.tippy) {
+      bubbleMenuRef.current.tippy.hide();
+      // Disable the bubble menu while modal is open
+      bubbleMenuRef.current.tippy.disable();
+    }
+    
+    // Ensure all bubble menus have the hide class
+    document.querySelectorAll('.bubble-menu').forEach(menu => 
+      menu.classList.add('hide-bubble-menu')
+    );
+    
+    // Then show the modal
     setIsCommentModalOpen(true);
   };
 
   // Handle when comment is submitted from modal
   const handleCommentSubmit = (commentText: string) => {
     if (editor) {
+      // Store the current selection position before adding the comment
+      const { from, to } = editor.state.selection;
+      
       // Add the comment
       editor.chain().focus().addComment({ comment: commentText }).run();
       
-      // Close the modal
-      setIsCommentModalOpen(false);
+      // Check if the selection already had comments before this submission
+      const hadExistingComments = existingComments.length > 0;
       
-      // Reset selection state and ensure bubble menu can appear for future selections
-      setTimeout(() => {
-        // Deselect everything first to clear any lingering selection state
-        editor.commands.blur();
+      // Update the list of existing comments to include the new one
+      const updatedComments = [...existingComments, commentText];
+      setExistingComments(updatedComments);
+      
+      // Only close the modal if this was a new comment on text without comments
+      if (!hadExistingComments) {
+        setIsCommentModalOpen(false);
         
-        // Then restore focus to editor but without any specific selection
-        editor.commands.focus('end');
-        
-        // Force tippy to update its position
-        if (bubbleMenuRef.current?.tippy) {
-          bubbleMenuRef.current.tippy.destroy();
-          bubbleMenuRef.current.tippy.enable();
+        // Reset selection state and ensure bubble menu can appear for future selections
+        // but maintain the cursor position near where the comment was added
+        setTimeout(() => {
+          // Briefly blur to clear any lingering selection state
+          editor.commands.blur();
+          
+          // Then restore focus at the stored selection position rather than at the end
+          editor.commands.setTextSelection({ from, to });
+          editor.commands.focus();
+          
+          // Force tippy to update its position
+          if (bubbleMenuRef.current?.tippy) {
+            bubbleMenuRef.current.tippy.destroy();
+            bubbleMenuRef.current.tippy.enable();
+          }
+        }, 100);
+      } else {
+        // For additional comments on already commented text, clear input but keep modal open
+        // Focus back on comment input for continued conversation and ensure bubble menu stays hidden
+        const commentInput = document.querySelector('.comment-input') as HTMLTextAreaElement;
+        if (commentInput) {
+          commentInput.value = '';
+          commentInput.focus();
         }
-      }, 100);
+        
+        // Force hide any bubble menus that might appear
+        if (bubbleMenuRef.current?.tippy) {
+          bubbleMenuRef.current.tippy.hide();
+          // Disable the bubble menu temporarily while modal is open
+          bubbleMenuRef.current.tippy.disable();
+        }
+        
+        // Also ensure all bubble menus have the hide class
+        document.querySelectorAll('.bubble-menu').forEach(menu => 
+          menu.classList.add('hide-bubble-menu')
+        );
+      }
     }
   };
 
