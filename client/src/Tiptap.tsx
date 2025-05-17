@@ -8,9 +8,11 @@ import {
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
+import Link from "@tiptap/extension-link";
 import { Comment } from "./lib/CommentExtension";
 import { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from "react";
 import CommentModal from "./components/ui/CommentModal";
+import LinkModal from "./components/ui/LinkModal";
 import "./Tiptap.css";
 
 // define your extension array with TextAlign and Underline
@@ -21,6 +23,15 @@ const extensions = [
     defaultAlignment: 'left',
   }),
   Underline,
+  Link.configure({
+    openOnClick: false,  // Prevent links from opening on click
+    linkOnPaste: true,
+    HTMLAttributes: {
+      class: 'tiptap-link',
+      rel: 'noopener noreferrer',
+      target: '_blank'
+    },
+  }),
   Comment,
 ];
 
@@ -41,6 +52,11 @@ const Tiptap = () => {
   const [commentModalPosition, setCommentModalPosition] = useState({ x: 0, y: 0 });
   const [existingComments, setExistingComments] = useState<string[]>([]);
   const [selectedText, setSelectedText] = useState<string>('');
+  // Link Modal state
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkModalPosition, setLinkModalPosition] = useState({ x: 0, y: 0 });
+  const [linkUrl, setLinkUrl] = useState<string>('');
+  const [linkText, setLinkText] = useState<string>('');
   // Reference to bubble menu's tippy instance
   const bubbleMenuRef = useRef<any>(null);
   
@@ -212,6 +228,72 @@ const Tiptap = () => {
     };
   }, [editor]);
 
+  // Add link click handler to edit existing links
+  useEffect(() => {
+    if (!editor) return;
+
+    // Function to handle clicks on links
+    const handleLinkClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      
+      // Check if the clicked element is a link
+      if (target.tagName === 'A' || target.closest('a')) {
+        // Prevent default link behavior (opening URL) immediately
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const linkElement = target.tagName === 'A' ? target : target.closest('a');
+        if (!linkElement) return;
+        
+        // Get the link URL
+        const href = linkElement.getAttribute('href');
+        
+        // Get position for modal - calculate to ensure it doesn't get cut off
+        const rect = linkElement.getBoundingClientRect();
+        
+        // Position the modal near the link
+        setLinkModalPosition({
+          x: rect.left + (rect.width / 2),
+          y: rect.bottom + 10
+        });
+        
+        // Set the current link URL and show the modal
+        setLinkUrl(href || '');
+        
+        // Select the link in the editor to ensure the edit applies to it
+        if (editor) {
+          // Create a selection that encompasses the link
+          const range = document.createRange();
+          range.selectNodeContents(linkElement);
+          
+          // Update the selection in editor
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // Synchronize editor's selection with DOM selection
+            const { from, to } = editor.state.selection;
+            editor.commands.setTextSelection({ from, to });
+          }
+        }
+        
+        // Open the modal
+        setIsLinkModalOpen(true);
+        
+        return false;
+      }
+    };
+
+    // Add event listener to editor DOM with capturing phase to catch events early
+    const editorElement = editor.view.dom;
+    editorElement.addEventListener('click', handleLinkClick, true);
+    
+    return () => {
+      editorElement.removeEventListener('click', handleLinkClick, true);
+    };
+  }, [editor]);
+
   // Handle adding a comment
   const handleAddComment = (event?: ReactMouseEvent) => {
     // Prevent the default behavior that might be causing DOM conflicts
@@ -322,6 +404,70 @@ const Tiptap = () => {
           menu.classList.add('hide-bubble-menu')
         );
       }
+    }
+  };
+
+  // Handle opening link modal
+  const handleLinkButtonClick = (event: ReactMouseEvent) => {
+    // Prevent default behavior
+    event.preventDefault();
+    
+    // Get the selection position for modal placement
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      
+      // Position the modal near the selection
+      setLinkModalPosition({
+        x: rect.left + (rect.width / 2),
+        y: rect.bottom + 10
+      });
+      
+      // Check if we're editing an existing link
+      let initialUrl = '';
+      if (editor?.isActive('link')) {
+        // Get the current link's URL
+        initialUrl = editor.getAttributes('link').href || '';
+      }
+      
+      setLinkUrl(initialUrl);
+      setIsLinkModalOpen(true);
+      
+      // Hide bubble menu while link modal is open
+      if (bubbleMenuRef.current?.tippy) {
+        bubbleMenuRef.current.tippy.hide();
+        bubbleMenuRef.current.tippy.disable();
+      }
+    }
+  };
+  
+  // Handle when link is submitted from modal
+  const handleLinkSubmit = (url: string) => {
+    if (editor) {
+      // Store the selection
+      const { from, to } = editor.state.selection;
+      
+      if (!url) {
+        // If URL is empty, unset the link
+        editor.chain().focus().unsetLink().run();
+      } else {
+        // Otherwise set the link with the provided URL
+        editor.chain().focus().setLink({ href: url }).run();
+      }
+      
+      // Close the modal
+      setIsLinkModalOpen(false);
+      
+      // Restore selection and focus
+      setTimeout(() => {
+        editor.commands.setTextSelection({ from, to });
+        editor.commands.focus();
+        
+        if (bubbleMenuRef.current?.tippy) {
+          bubbleMenuRef.current.tippy.enable();
+        }
+      }, 100);
     }
   };
 
@@ -672,12 +818,7 @@ const Tiptap = () => {
               
               {/* Links and more */}
               <button 
-                onClick={() => {
-                  const url = window.prompt('URL')
-                  if (url) {
-                    editor?.chain().focus().setLink({ href: url }).run()
-                  }
-                }}
+                onClick={handleLinkButtonClick}
                 className={`toolbar-button ${editor?.isActive("link") ? "is-active" : ""}`}
               >
                 <span role="img" aria-label="link">🔗</span>
@@ -707,6 +848,15 @@ const Tiptap = () => {
               existingComments={existingComments}
               selectedText={selectedText}
               position={commentModalPosition}
+            />
+            
+            {/* Link Modal Component */}
+            <LinkModal
+              isOpen={isLinkModalOpen}
+              onClose={() => setIsLinkModalOpen(false)}
+              onSubmit={handleLinkSubmit}
+              initialUrl={linkUrl}
+              position={linkModalPosition}
             />
           </div>
           

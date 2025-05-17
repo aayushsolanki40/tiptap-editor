@@ -239,13 +239,42 @@
   line-height: 1.6;
 }
 
+/* Link styling in editor */
 .ProseMirror a {
-  color: var(--primary-color);
+  color: #4a6fa5;
   text-decoration: none;
+  border-bottom: 1px solid rgba(74, 111, 165, 0.3);
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  position: relative;
+  cursor: pointer; /* Show pointer cursor to indicate interactivity */
 }
 
 .ProseMirror a:hover {
-  text-decoration: underline;
+  background-color: rgba(74, 111, 165, 0.1);
+  border-bottom-color: #4a6fa5;
+}
+
+/* When a link is selected/active in the editor */
+.ProseMirror a.is-active,
+.ProseMirror a:active {
+  background-color: rgba(74, 111, 165, 0.15);
+}
+
+/* Add a small icon indicator for links that looks like an edit icon */
+.ProseMirror a::after {
+  content: "↗";
+  font-size: 0.8em;
+  display: inline-block;
+  margin-left: 4px;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+  vertical-align: super;
+  font-size: 10px;
+}
+
+/* Ensure tiptap-link class has correct styling */
+.tiptap-link {
+  cursor: pointer;
 }
 
 /* Comment styling */
