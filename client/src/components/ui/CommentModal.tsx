@@ -34,6 +34,95 @@ const CommentModal: React.FC<CommentModalProps> = ({
   const [isResolved, setIsResolved] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [modalPosition, setModalPosition] = useState({ top: 0, left: 0, transform: '' });
+
+  // Calculate best position for the modal when it opens or position changes
+  useEffect(() => {
+    if (isOpen && modalRef.current) {
+      // Adjust modal height based on whether there are existing comments
+      const modalHeight = existingComments.length > 0? 400 : 200; // Height is 200 initially, 400 with replies
+      const modalWidth = 400;   // Approximate comment modal width
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      
+      // Safety margin to keep modal from touching edges
+      const safetyMargin = 20;
+      
+      // Get the editor boundaries
+      const editorElement = document.querySelector('.document-container');
+      const editorRect = editorElement?.getBoundingClientRect() || {
+        left: 0,
+        right: viewportWidth,
+        top: 0,
+        bottom: viewportHeight
+      };
+      
+      // Calculate horizontal position - centered on selection but within editor boundaries
+      const leftPos = Math.min(
+        Math.max(
+          position.x, 
+          editorRect.left + (modalWidth / 2) + safetyMargin
+        ),
+        editorRect.right - (modalWidth / 2) - safetyMargin
+      );
+      
+      // Check if there's enough space below the selection
+      const spaceBelow = viewportHeight - position.y - safetyMargin;
+      const spaceAbove = position.y - safetyMargin;
+      
+      let topPos: number;
+      let transform: string;
+      
+      // If we're replying to an existing comment, keep the modal close to the text
+      if (existingComments.length > 0) {
+        // For replies, give priority to showing below the text even if slightly cut off
+        if (spaceBelow >= modalHeight * 0.7) { // Allow showing if at least 70% fits below
+          topPos = position.y;
+          transform = 'translate(-50%, 10px)';
+        } else {
+          // If really not enough space below, show above but closer to text
+          topPos = position.y;
+          transform = 'translate(-50%, -90%)'; // Position closer to text (90% instead of 100%+10px)
+        }
+      } else {
+        // For new comments, use the standard positioning logic
+        // If modal fits below selection, place it there (default)
+        if (spaceBelow >= modalHeight) {
+          topPos = position.y;
+          transform = 'translate(-50%, 10px)';
+        } 
+        // If not enough space below but enough above, place it above selection
+        else if (spaceAbove >= modalHeight) {
+          topPos = position.y;
+          transform = 'translate(-50%, -100%) translateY(-10px)';
+        }
+        // In tight spaces, position modal centered in available space
+        else {
+          // More space below than above
+          if (spaceBelow >= spaceAbove) {
+            topPos = viewportHeight - modalHeight - safetyMargin + scrollY;
+            transform = 'translateX(-50%)';
+          } 
+          // More space above than below
+          else {
+            // Ensure we don't position above the editor top
+            topPos = Math.max(
+              safetyMargin + scrollY,
+              editorRect.top + safetyMargin + scrollY
+            );
+            transform = 'translateX(-50%)';
+          }
+        }
+      }
+      
+      setModalPosition({
+        top: topPos,
+        left: leftPos,
+        transform
+      });
+    }
+  }, [isOpen, position, existingComments.length]);
 
   useEffect(() => {
     // Clear comment text when modal opens
@@ -136,8 +225,10 @@ const CommentModal: React.FC<CommentModalProps> = ({
         ref={modalRef}
         className="comment-modal"
         style={{
-          top: `${position.y}px`,
-          left: `${position.x}px`,
+          position: 'absolute',
+          top: `${modalPosition.top}px`,
+          left: `${modalPosition.left}px`,
+          transform: modalPosition.transform
         }}
       >
         <div className="comment-modal-header">
@@ -214,7 +305,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
               ref={inputRef}
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Comment or type '/' for commands and AI actions"
+              placeholder="Enter comment here..."
               className="comment-input"
             />
             <div className="comment-input-actions">
