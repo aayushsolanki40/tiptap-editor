@@ -64,8 +64,16 @@ const Tiptap = () => {
     } else {
       // Remove hide class when modal is closed
       bubbleMenus.forEach(menu => menu.classList.remove('hide-bubble-menu'));
+      
+      // When modal closes, refresh the editor's selection state to enable bubble menu
+      if (editor) {
+        setTimeout(() => {
+          // This helps ensure bubble menu can reappear for new selections
+          editor.commands.focus();
+        }, 50);
+      }
     }
-  }, [isCommentModalOpen]);
+  }, [isCommentModalOpen, editor]);
 
   // Get current active heading or paragraph
   const getActiveHeading = () => {
@@ -226,15 +234,20 @@ const Tiptap = () => {
       // Close the modal
       setIsCommentModalOpen(false);
       
-      // Force bubble menu to show by triggering a selection update
+      // Reset selection state and ensure bubble menu can appear for future selections
       setTimeout(() => {
-        // This will refresh Tiptap's selection state and trigger bubble menu
-        if (editor.state.selection) {
-          const { from, to } = editor.state.selection;
-          editor.commands.setTextSelection({ from, to });
-          editor.commands.focus();
+        // Deselect everything first to clear any lingering selection state
+        editor.commands.blur();
+        
+        // Then restore focus to editor but without any specific selection
+        editor.commands.focus('end');
+        
+        // Force tippy to update its position
+        if (bubbleMenuRef.current?.tippy) {
+          bubbleMenuRef.current.tippy.destroy();
+          bubbleMenuRef.current.tippy.enable();
         }
-      }, 50);
+      }, 100);
     }
   };
 
@@ -443,6 +456,21 @@ const Tiptap = () => {
                 onShow: () => {
                   // Only show if comment modal is not open
                   return !isCommentModalOpen;
+                },
+                onHidden: () => {
+                  // When bubble menu hides and it's not because the modal is open,
+                  // make sure it can reappear on new selections
+                  if (!isCommentModalOpen && editor) {
+                    // This minimal delay helps avoid state conflicts
+                    setTimeout(() => {
+                      // Refresh tippy's state
+                      if (bubbleMenuRef.current?.tippy) {
+                        bubbleMenuRef.current.tippy.setProps({ 
+                          trigger: 'mouseenter focus' 
+                        });
+                      }
+                    }, 10);
+                  }
                 }
               }}
               ref={bubbleMenuRef} // Attach ref here
