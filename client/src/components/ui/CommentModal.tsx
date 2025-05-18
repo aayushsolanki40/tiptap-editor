@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useCommentStore } from '../../lib/CommentStore';
 import './CommentModal.css';
 
 interface CommentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (commentText: string) => void;
-  existingComments?: string[];
+  onSubmit: (commentText: string, threadId?: string) => void;
+  threadId?: string;
   selectedText?: string;
   position?: { x: number; y: number };
-  onResolve?: () => void; // Add new prop for resolve callback
+  onResolve?: () => void;
 }
 
 // Common emojis for the picker
@@ -22,7 +23,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  existingComments = [],
+  threadId,
   selectedText = "",
   position = { x: 0, y: 0 },
   onResolve
@@ -31,6 +32,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const [userName] = useState('Aayush Solanki');
   const [userInitials] = useState('AS');
+  const [userId] = useState('user-1'); // In a real app, this would come from auth
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isResolved, setIsResolved] = useState(false);
@@ -38,12 +40,18 @@ const CommentModal: React.FC<CommentModalProps> = ({
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [modalPosition, setModalPosition] = useState({ top: 0, left: 0, transform: '' });
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-
+  
+  // Get comment thread data from our store
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { getThread, getCommentCount } = useCommentStore();
+  const thread = threadId ? getThread(threadId) : undefined;
+  const comments = thread?.comments || [];
+  
   // Calculate best position for the modal when it opens or position changes
   useEffect(() => {
     if (isOpen && modalRef.current) {
       // Adjust modal height based on whether there are existing comments
-      const modalHeight = existingComments.length > 0? 400 : 200; // Height is 200 initially, 400 with replies
+      const modalHeight = comments.length > 0? 400 : 200; // Height is 200 initially, 400 with replies
       const modalWidth = 400;   // Approximate comment modal width
       const viewportHeight = window.innerHeight;
       const viewportWidth = window.innerWidth;
@@ -78,7 +86,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
       let transform: string;
       
       // If we're replying to an existing comment, keep the modal close to the text
-      if (existingComments.length > 0) {
+      if (comments.length > 0) {
         // For replies, give priority to showing below the text even if slightly cut off
         if (spaceBelow >= modalHeight * 0.7) { // Allow showing if at least 70% fits below
           topPos = position.y;
@@ -125,7 +133,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
         transform
       });
     }
-  }, [isOpen, position, existingComments.length]);
+  }, [isOpen, position, comments.length]);
 
   useEffect(() => {
     // Clear comment text when modal opens
@@ -178,7 +186,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (commentText.trim()) {
-      onSubmit(commentText);
+      onSubmit(commentText, threadId);
       setCommentText('');
       // Don't close the modal automatically - the parent component will handle that
     }
@@ -251,6 +259,23 @@ const CommentModal: React.FC<CommentModalProps> = ({
     setIsResolved(false);
   };
 
+  // Format date for display
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    const diffHours = Math.round(diffMs / 3600000);
+    const diffDays = Math.round(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 30) return `${diffDays}d ago`;
+    
+    return date.toLocaleDateString();
+  };
+
   if (!isOpen) return null;
   
   // Format the highlighted text - limiting it to first 50 characters if not expanded
@@ -314,46 +339,48 @@ const CommentModal: React.FC<CommentModalProps> = ({
         <div className="comment-modal-content">
           <div className="comment-thread">
             {/* First comment with highlighted text */}
-            {existingComments.length > 0 && (
+            {comments.length > 0 && (
               <div className="comment-item">
-                <div className="user-avatar">{userInitials}</div>
+                <div className="user-avatar">{comments[0].userName.substring(0, 2).toUpperCase()}</div>
                 <div className="comment-content">
                   <div className="comment-header">
-                    <span className="user-name">{userName}</span>
-                    <span className="comment-timestamp">Just now</span>
+                    <span className="user-name">{comments[0].userName}</span>
+                    <span className="comment-timestamp">{formatDate(comments[0].timestamp)}</span>
                   </div>
 
-                  <div
-                    className="comment-highlighted"
-                    onClick={toggleTextExpand}
-                  >
-                    <p className="comment-highlighted-text">{displayText}</p>
-                    { displayText.length > 50 &&
-                      <span
-                        className={`dropdown-icon ${
-                          isTextExpanded ? "open" : ""
-                        }`}
-                      >
-                        ▼
-                      </span>
-                    }
-                  </div>
+                  {selectedText && (
+                    <div
+                      className="comment-highlighted"
+                      onClick={toggleTextExpand}
+                    >
+                      <p className="comment-highlighted-text">{displayText}</p>
+                      { selectedText.length > 50 &&
+                        <span
+                          className={`dropdown-icon ${
+                            isTextExpanded ? "open" : ""
+                          }`}
+                        >
+                          ▼
+                        </span>
+                      }
+                    </div>
+                  )}
 
-                  <div className="comment-text">{existingComments[0]}</div>
+                  <div className="comment-text">{comments[0].text}</div>
                 </div>
               </div>
             )}
 
-            {/* Additional comments here if needed */}
-            {existingComments.slice(1).map((comment, index) => (
-              <div className="comment-item" key={index}>
-                <div className="user-avatar">{userInitials}</div>
+            {/* Additional comments in the thread */}
+            {comments.slice(1).map((comment, index) => (
+              <div className="comment-item" key={comment.id}>
+                <div className="user-avatar">{comment.userName.substring(0, 2).toUpperCase()}</div>
                 <div className="comment-content">
                   <div className="comment-header">
-                    <span className="user-name">{userName}</span>
-                    <span className="comment-timestamp">Just now</span>
+                    <span className="user-name">{comment.userName}</span>
+                    <span className="comment-timestamp">{formatDate(comment.timestamp)}</span>
                   </div>
-                  <div className="comment-text">{comment}</div>
+                  <div className="comment-text">{comment.text}</div>
                 </div>
               </div>
             ))}
@@ -376,6 +403,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
                 <button 
                   className="input-action-btn"
                   onClick={toggleEmojiPicker}
+                  type="button"
                 >
                   😊
                 </button>
@@ -389,6 +417,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
                       <button 
                         key={index} 
                         className="emoji-btn"
+                        type="button"
                         onClick={() => {
                           insertEmoji(emoji);
                           setShowEmojiPicker(false);
@@ -404,6 +433,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
                 className="send-button"
                 disabled={!commentText.trim()}
                 onClick={handleSubmit}
+                type="button"
               >
                 Send
               </button>

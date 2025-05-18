@@ -9,7 +9,8 @@ import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
-import { Comment } from "./lib/CommentExtension";
+import { CommentThread } from "./lib/CommentThreadExtension";
+import { CommentStoreProvider, useCommentStore } from "./lib/CommentStore";
 import { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from "react";
 import CommentModal from "./components/ui/CommentModal";
 import LinkModal from "./components/ui/LinkModal";
@@ -32,12 +33,12 @@ const extensions = [
       target: '_blank'
     },
   }),
-  Comment,
+  CommentThread, // Use our new CommentThread extension
 ];
 
 const content = "<p>Hello World! Start typing to edit this content...</p>";
 
-const Tiptap = () => {
+const TiptapEditor = () => {
   const editor = useEditor({
     extensions,
     content,
@@ -47,19 +48,24 @@ const Tiptap = () => {
   const [currentDocument, setCurrentDocument] = useState("Untitled Document");
   const [showSidebar, setShowSidebar] = useState(true);
   const [isHeadingDropdownOpen, setIsHeadingDropdownOpen] = useState(false);
+  
   // Comment Modal state
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentModalPosition, setCommentModalPosition] = useState({ x: 0, y: 0 });
-  const [existingComments, setExistingComments] = useState<string[]>([]);
+  const [currentThreadId, setCurrentThreadId] = useState<string | undefined>(undefined);
   const [selectedText, setSelectedText] = useState<string>('');
+  
   // Link Modal state
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkModalPosition, setLinkModalPosition] = useState({ x: 0, y: 0 });
   const [linkUrl, setLinkUrl] = useState<string>('');
+  
   // Reference to bubble menu's tippy instance
   const bubbleMenuRef = useRef<any>(null);
-  
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Access the comment store
+  const { addThread, addCommentToThread, getThread, resolveThread } = useCommentStore();
   
   // Function to calculate optimal modal position based on selection
   const getOptimalModalPosition = (rect: DOMRect) => {
@@ -219,9 +225,15 @@ const Tiptap = () => {
       
       // Check if clicked element has comments
       if (target.classList.contains('has-comments')) {
-        // Store the current selection before anything happens
+        // Get the thread ID from the data attribute
+        const threadId = target.getAttribute('data-thread-id');
+        if (!threadId) return;
         
-        // Get position for modal - calculate to ensure it doesn't get cut off
+        // Get the thread data from our store
+        const thread = getThread(threadId);
+        if (!thread) return;
+        
+        // Get position for modal
         const rect = target.getBoundingClientRect();
         
         // Calculate vertical position to ensure modal appears below the text
@@ -239,44 +251,30 @@ const Tiptap = () => {
           y: verticalPosition
         });
 
-        try {
-          // Parse comments from the data-comments attribute
-          const commentsData = target.getAttribute('data-comments');
-          if (commentsData) {
-            const comments = JSON.parse(commentsData);
-            setExistingComments(Array.isArray(comments) ? comments : [comments]);
+        // Store the selected text and thread ID
+        setSelectedText(target.textContent || '');
+        setCurrentThreadId(threadId);
+        
+        // Select the commented text to ensure the comment gets added at the right place
+        if (editor && target.textContent) {
+          // Create a selection that encompasses the commented text node
+          const range = document.createRange();
+          range.selectNodeContents(target); 
+          
+          // Update the selection in editor
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
             
-            // Select the commented text to ensure the comment gets added at the right place
-            if (editor && target.textContent) {
-              // Create a selection that encompasses the commented text node
-              const commentedNode = target.childNodes[0];
-              
-              if (commentedNode) {
-                const range = document.createRange();
-                range.selectNodeContents(target); 
-                
-                // Store the selected text
-                setSelectedText(target.textContent);
-                
-                // Update the selection in editor
-                const selection = window.getSelection();
-                if (selection) {
-                  selection.removeAllRanges();
-                  selection.addRange(range);
-                  
-                  // Synchronize editor's selection with DOM selection
-                  const { from, to } = editor.state.selection;
-                  editor.commands.setTextSelection({ from, to });
-                }
-              }
-            }
-            
-            // Then open the modal
-            setIsCommentModalOpen(true);
+            // Synchronize editor's selection with DOM selection
+            const { from, to } = editor.state.selection;
+            editor.commands.setTextSelection({ from, to });
           }
-        } catch (e) {
-          console.error('Error parsing comments:', e);
         }
+        
+        // Open the modal
+        setIsCommentModalOpen(true);
 
         event.preventDefault();
         event.stopPropagation();
@@ -290,7 +288,7 @@ const Tiptap = () => {
     return () => {
       editorElement.removeEventListener('click', handleCommentClick);
     };
-  }, [editor]);
+  }, [editor, getThread]);
 
   // Add link click handler to edit existing links
   useEffect(() => {
@@ -390,12 +388,14 @@ const Tiptap = () => {
       }
     }
 
-    if (editor?.isActive('comment')) {
-      // If selection already has comments, get them
-      const comments = editor.commands.getComments();
-      setExistingComments(comments);
+    // Check if selection already has a comment thread attached
+    if (editor?.isActive('commentThread')) {
+      // If selection has a comment thread, get the thread ID
+      const threadId = editor.commands.getCommentThreadId();
+      setCurrentThreadId(threadId || undefined);
     } else {
-      setExistingComments([]);
+      // No existing comment thread
+      setCurrentThreadId(undefined);
     }
     
     // Force hide any bubble menus first
@@ -415,62 +415,83 @@ const Tiptap = () => {
   };
 
   // Handle when comment is submitted from modal
-  const handleCommentSubmit = (commentText: string) => {
-    if (editor) {
-      // Store the current selection position before adding the comment
-      const { from, to } = editor.state.selection;
+  const handleCommentSubmit = (commentText: string, threadId?: string) => {
+    if (!editor) return;
+    
+    // Store the current selection position
+    const { from, to } = editor.state.selection;
+    
+    // If there's no thread ID, create a new thread
+    if (!threadId) {
+      // Create a new thread in the store
+      const newThreadId = addThread(
+        selectedText,
+        commentText,
+        'user-1', // In a real app, this would be the current user ID
+        'Aayush Solanki' // In a real app, this would be the current user name
+      );
       
-      // Add the comment
-      editor.chain().focus().addComment({ comment: commentText }).run();
+      // Add the thread ID to the selected text in the editor
+      editor.chain()
+        .focus()
+        .addCommentThread({ threadId: newThreadId })
+        .run();
       
-      // Check if the selection already had comments before this submission
-      const hadExistingComments = existingComments.length > 0;
+      // Close the modal
+      setIsCommentModalOpen(false);
       
-      // Update the list of existing comments to include the new one
-      const updatedComments = [...existingComments, commentText];
-      setExistingComments(updatedComments);
-      
-      // Only close the modal if this was a new comment on text without comments
-      if (!hadExistingComments) {
-        setIsCommentModalOpen(false);
+      // Reset selection state and ensure bubble menu can appear for future selections
+      // but maintain the cursor position near where the comment was added
+      setTimeout(() => {
+        // First, ensure bubble menu is disabled until explicitly re-enabled
+        if (bubbleMenuRef.current?.tippy) {
+          bubbleMenuRef.current.tippy.disable();
+        }
         
-        // Reset selection state and ensure bubble menu can appear for future selections
-        // but maintain the cursor position near where the comment was added
+        // Add a short delay before restoring selection to avoid bubble menu appearing
         setTimeout(() => {
           // Briefly blur to clear any lingering selection state
           editor.commands.blur();
           
-          // Then restore focus at the stored selection position rather than at the end
+          // Then restore focus at the stored selection position
           editor.commands.setTextSelection({ from, to });
           editor.commands.focus();
           
-          // Force tippy to update its position
-          if (bubbleMenuRef.current?.tippy) {
-            bubbleMenuRef.current.tippy.destroy();
-            bubbleMenuRef.current.tippy.enable();
-          }
+          // Wait a bit before re-enabling the bubble menu to prevent it from appearing immediately
+          setTimeout(() => {
+            if (bubbleMenuRef.current?.tippy) {
+              bubbleMenuRef.current.tippy.enable();
+            }
+          }, 300);
         }, 100);
-      } else {
-        // For additional comments on already commented text, clear input but keep modal open
-        // Focus back on comment input for continued conversation and ensure bubble menu stays hidden
-        const commentInput = document.querySelector('.comment-input') as HTMLTextAreaElement;
-        if (commentInput) {
-          commentInput.value = '';
-          commentInput.focus();
-        }
-        
-        // Force hide any bubble menus that might appear
-        if (bubbleMenuRef.current?.tippy) {
-          bubbleMenuRef.current.tippy.hide();
-          // Disable the bubble menu temporarily while modal is open
-          bubbleMenuRef.current.tippy.disable();
-        }
-        
-        // Also ensure all bubble menus have the hide class
-        document.querySelectorAll('.bubble-menu').forEach(menu => 
-          menu.classList.add('hide-bubble-menu')
-        );
+      }, 100);
+    } else {
+      // Add a comment to an existing thread
+      addCommentToThread(
+        threadId,
+        commentText,
+        'user-1', // In a real app, this would be the current user ID
+        'Aayush Solanki' // In a real app, this would be the current user name
+      );
+      
+      // For additional comments on already commented text, clear input but keep modal open
+      // Focus back on comment input for continued conversation
+      const commentInput = document.querySelector('.comment-input') as HTMLTextAreaElement;
+      if (commentInput) {
+        commentInput.value = '';
+        commentInput.focus();
       }
+      
+      // Force hide any bubble menus that might appear
+      if (bubbleMenuRef.current?.tippy) {
+        bubbleMenuRef.current.tippy.hide();
+        bubbleMenuRef.current.tippy.disable();
+      }
+      
+      // Ensure all bubble menus have the hide class
+      document.querySelectorAll('.bubble-menu').forEach(menu => 
+        menu.classList.add('hide-bubble-menu')
+      );
     }
   };
 
@@ -543,15 +564,18 @@ const Tiptap = () => {
 
   // Handle when comment is resolved
   const handleCommentResolve = () => {
-    if (editor) {
-      // Remove the comment formatting from the currently selected text
-      editor.chain().focus().unsetComment().run();
+    if (editor && currentThreadId) {
+      // Mark the thread as resolved in our store
+      resolveThread(currentThreadId);
+      
+      // Remove the comment thread mark from the selected text
+      editor.chain().focus().unsetCommentThread().run();
       
       // Close the modal
       setIsCommentModalOpen(false);
       
-      // Reset existing comments array
-      setExistingComments([]);
+      // Reset thread ID
+      setCurrentThreadId(undefined);
       
       // Re-enable the bubble menu after modal closes
       setTimeout(() => {
@@ -921,7 +945,7 @@ const Tiptap = () => {
                   e.preventDefault();
                   handleAddComment(e);
                 }}
-                className={`toolbar-button ${editor?.isActive("comment") ? "is-active" : ""}`}
+                className={`toolbar-button ${editor?.isActive("commentThread") ? "is-active" : ""}`}
               >
                 <span role="img" aria-label="comment">💬</span>
               </button>
@@ -936,10 +960,10 @@ const Tiptap = () => {
               isOpen={isCommentModalOpen}
               onClose={() => setIsCommentModalOpen(false)}
               onSubmit={handleCommentSubmit}
-              existingComments={existingComments}
+              threadId={currentThreadId}
               selectedText={selectedText}
               position={commentModalPosition}
-              onResolve={handleCommentResolve} // Pass the resolve handler
+              onResolve={handleCommentResolve}
             />
             
             {/* Link Modal Component */}
@@ -964,6 +988,15 @@ const Tiptap = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Wrap the TiptapEditor with our CommentStoreProvider
+const Tiptap = () => {
+  return (
+    <CommentStoreProvider>
+      <TiptapEditor />
+    </CommentStoreProvider>
   );
 };
 
